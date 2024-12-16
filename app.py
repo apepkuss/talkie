@@ -2,12 +2,18 @@ import os
 
 import gradio as gr
 import openai
+import requests
 
 # Set your OpenAI API key
 openai.api_key = "your-api-key-here"  # Replace with your actual API key
 
 # Initialize conversation history
-conversation_history = []
+conversation_history = [
+    {
+        "role": "system",
+        "content": "You are a helpful AI assistant. You should answer questions as precisely and concisely as possible.",
+    }
+]
 
 
 def chat_with_bot(message, history):
@@ -16,26 +22,29 @@ def chat_with_bot(message, history):
 
     try:
         # TODO: 调用llama-api-server
+        print(f"Generating chat completions")
+        chat_url = "http://localhost:10086/v1/chat/completions"
+        headers = {"Content-Type": "application/json"}
 
-        # # Get response from OpenAI
-        # response = openai.ChatCompletion.create(
-        #     model="gpt-3.5-turbo", messages=conversation_history
-        # )
+        # 构造请求的 JSON 数据
+        data = {
+            "messages": conversation_history,
+            "model": "llama",
+            "stream": False,
+        }
 
-        # # Extract assistant's response
-        # assistant_response = response.choices[0].message["content"]
+        # 发送 POST 请求
+        chat_completion_response = requests.post(
+            chat_url, headers=headers, json=data
+        ).json()
+        assistant_message = chat_completion_response["choices"][0]["message"]["content"]
 
-        # # Add assistant's response to conversation history
-        # conversation_history.append(
-        #     {"role": "assistant", "content": assistant_response}
-        # )
+        # 打印响应内容
+        print(f"AI Response: {assistant_message}")
 
-        assistant_response = "dummy response"
-        conversation_history.append(
-            {"role": "assistant", "content": assistant_response}
-        )
+        conversation_history.append({"role": "assistant", "content": assistant_message})
 
-        return assistant_response
+        return conversation_history
 
     except Exception as e:
         return f"An error occurred: {str(e)}"
@@ -54,7 +63,7 @@ with gr.Blocks(theme="soft") as demo:
     with gr.Row():
         with gr.Column():
             # Chat history display
-            chatbot = gr.Chatbot()
+            chatbot = gr.Chatbot(type="messages")
 
             # Input type selector
             input_type = gr.Radio(
@@ -91,6 +100,8 @@ with gr.Blocks(theme="soft") as demo:
 
     # Handle submissions
     def process_input(text_msg, audio_msg, input_mode):
+        print(f"Processing input: {text_msg}, {audio_msg}, {input_mode}")
+
         if input_mode == "Keyboard":
             return chat_with_bot(text_msg, None)
         else:
