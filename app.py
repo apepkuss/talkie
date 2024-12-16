@@ -16,12 +16,12 @@ conversation_history = [
 ]
 
 
-def chat_with_bot(message, history):
+def chat_with_bot(message):
     # Add user message to conversation history
     conversation_history.append({"role": "user", "content": message})
 
     try:
-        # TODO: 调用llama-api-server
+        # 调用llama-api-server
         print(f"Generating chat completions")
         chat_url = "http://localhost:10086/v1/chat/completions"
         headers = {"Content-Type": "application/json"}
@@ -44,7 +44,7 @@ def chat_with_bot(message, history):
 
         conversation_history.append({"role": "assistant", "content": assistant_message})
 
-        return conversation_history
+        return assistant_message
 
     except Exception as e:
         return f"An error occurred: {str(e)}"
@@ -56,6 +56,7 @@ def transcribe_audio(audio):
     return audio
 
 
+# 改进后的 Gradio App
 with gr.Blocks(theme="soft") as demo:
     gr.Markdown("# ChatGPT-like Assistant")
     gr.Markdown("Ask me anything using text or voice!")
@@ -98,19 +99,47 @@ with gr.Blocks(theme="soft") as demo:
         outputs=[text_input_group, voice_input_group],
     )
 
-    # Handle submissions
-    def process_input(text_msg, audio_msg, input_mode):
+    # 改进后的逻辑：用户输入即时显示
+    def process_input(text_msg, audio_msg, input_mode, chat_history):
         print(f"Processing input: {text_msg}, {audio_msg}, {input_mode}")
 
-        if input_mode == "Keyboard":
-            return chat_with_bot(text_msg, None)
-        else:
-            return chat_with_bot(audio_msg, None)
+        if input_mode == "Keyboard" and text_msg:
+            # 即时显示用户输入
+            user_message = {"role": "user", "content": text_msg}
+            chat_history.append(user_message)
+
+            # 获取 AI 响应
+            bot_response = chat_with_bot(text_msg)
+
+            # 更新最后一条消息，加入 AI 响应
+            bot_message = {"role": "assistant", "content": bot_response}
+            chat_history.append(bot_message)
+
+            return chat_history, "", None  # 清空输入框
+
+        elif input_mode == "Voice" and audio_msg is not None:
+            # 处理语音输入
+            transcribed_msg = transcribe_audio(audio_msg)
+            if transcribed_msg:
+                # 即时显示用户输入
+                user_message = {"role": "user", "content": transcribed_msg}
+                chat_history.append(user_message)
+
+                # 获取 AI 响应
+                bot_response = chat_with_bot(transcribed_msg)
+
+                # 更新最后一条消息，加入 AI 响应
+                bot_message = {"role": "assistant", "content": bot_response}
+                chat_history.append(bot_message)
+
+            return chat_history, None, None  # 清空音频输入
+
+        return chat_history, text_msg, audio_msg
 
     submit_btn.click(
         fn=process_input,
-        inputs=[text_input, audio_input, input_type],
-        outputs=chatbot,
+        inputs=[text_input, audio_input, input_type, chatbot],
+        outputs=[chatbot, text_input, audio_input],
     )
 
 if __name__ == "__main__":
