@@ -1,11 +1,5 @@
-import os
-
 import gradio as gr
-import openai
 import requests
-
-# Set your OpenAI API key
-openai.api_key = "your-api-key-here"  # Replace with your actual API key
 
 # Initialize conversation history
 conversation_history = [
@@ -17,6 +11,11 @@ conversation_history = [
 
 
 def chat_with_bot(message):
+    """
+    Sends the user's message to the API and returns the assistant's response.
+    """
+    print(f"User message: {message}")
+
     # Add user message to conversation history
     conversation_history.append({"role": "user", "content": message})
 
@@ -51,12 +50,16 @@ def chat_with_bot(message):
 
 
 def transcribe_audio(audio):
+    """
+    Mock transcribe audio function. In real use, integrate a transcription API or library.
+    """
     if audio is None:
         return ""
-    return audio
+    # 模拟返回的转录文本
+    return "This is a transcribed text from the audio."
 
 
-# 改进后的 Gradio App
+# Gradio App
 with gr.Blocks(theme="soft") as demo:
     gr.Markdown("# ChatGPT-like Assistant")
     gr.Markdown("Ask me anything using text or voice!")
@@ -80,7 +83,7 @@ with gr.Blocks(theme="soft") as demo:
             # Voice input
             with gr.Column(visible=False) as voice_input_group:
                 audio_input = gr.Audio(
-                    sources=["microphone"], type="numpy", label="Voice Input"
+                    sources="microphone", type="numpy", label="Voice Input"
                 )
 
             # Submit button
@@ -88,9 +91,12 @@ with gr.Blocks(theme="soft") as demo:
 
     # Handle visibility of input methods
     def update_input_type(choice):
+        """
+        Dynamically show/hide text or voice input based on user's choice.
+        """
         return (
-            gr.Column(visible=(choice == "Keyboard")),
-            gr.Column(visible=(choice == "Voice")),
+            gr.update(visible=(choice == "Keyboard")),
+            gr.update(visible=(choice == "Voice")),
         )
 
     input_type.change(
@@ -100,46 +106,52 @@ with gr.Blocks(theme="soft") as demo:
     )
 
     # 改进后的逻辑：用户输入即时显示
-    def process_input(text_msg, audio_msg, input_mode, chat_history):
-        print(f"Processing input: {text_msg}, {audio_msg}, {input_mode}")
-
+    def process_user_input(text_msg, audio_msg, input_mode, chat_history):
+        """
+        Handles user input (text or voice) and updates the chat history.
+        - Shows user input immediately in the chatbox.
+        """
         if input_mode == "Keyboard" and text_msg:
-            # 即时显示用户输入
             user_message = {"role": "user", "content": text_msg}
-            chat_history.append(user_message)
-
-            # 获取 AI 响应
-            bot_response = chat_with_bot(text_msg)
-
-            # 更新最后一条消息，加入 AI 响应
-            bot_message = {"role": "assistant", "content": bot_response}
-            chat_history.append(bot_message)
-
-            return chat_history, "", None  # 清空输入框
+            conversation_history.append(user_message)
+            chat_history.append(user_message)  # 添加用户文本输入
+            return chat_history, "", None  # 返回更新后的聊天记录，清空文本框
 
         elif input_mode == "Voice" and audio_msg is not None:
-            # 处理语音输入
-            transcribed_msg = transcribe_audio(audio_msg)
-            if transcribed_msg:
-                # 即时显示用户输入
-                user_message = {"role": "user", "content": transcribed_msg}
-                chat_history.append(user_message)
+            transcribed_msg = transcribe_audio(audio_msg)  # 模拟语音转文本
+            user_message = {"role": "user", "content": transcribed_msg}
+            chat_history.append(user_message)  # 添加用户语音输入的转文本
+            return chat_history, None, None  # 清空音频输入框
 
-                # 获取 AI 响应
-                bot_response = chat_with_bot(transcribed_msg)
+        else:
+            return chat_history, None, None
 
-                # 更新最后一条消息，加入 AI 响应
-                bot_message = {"role": "assistant", "content": bot_response}
-                chat_history.append(bot_message)
+    def process_bot_response(audio_msg, input_mode, chat_history):
+        """
+        Processes the assistant's response and appends it to the chat history.
+        """
+        # user_input = (
+        #     text_msg if input_mode == "Keyboard" else transcribe_audio(audio_msg)
+        # )
+        # if user_input:
+        #     bot_response = chat_with_bot(user_input)  # 获取 AI 响应
+        #     ai_message = {"role": "assistant", "content": bot_response}
+        #     chat_history.append(ai_message)  # 显示 AI 响应
+        bot_response = chat_with_bot("none")  # 获取 AI 响应
+        ai_message = {"role": "assistant", "content": bot_response}
+        chat_history.append(ai_message)  # 显示 AI 响应
+        return chat_history
 
-            return chat_history, None, None  # 清空音频输入
-
-        return chat_history, text_msg, audio_msg
-
+    # 按钮点击事件处理
     submit_btn.click(
-        fn=process_input,
+        fn=process_user_input,
         inputs=[text_input, audio_input, input_type, chatbot],
         outputs=[chatbot, text_input, audio_input],
+    ).then(
+        fn=process_bot_response,
+        # inputs=[text_input, audio_input, input_type, chatbot],
+        inputs=[audio_input, input_type, chatbot],
+        outputs=chatbot,
     )
 
 if __name__ == "__main__":
