@@ -146,9 +146,6 @@ with gr.Blocks(theme="soft") as demo:
                     streaming=False,
                 )
 
-            # Submit button
-            submit_btn = gr.Button("Submit")
-
     # Handle visibility of input methods
     def update_input_type(choice):
         """
@@ -243,24 +240,6 @@ with gr.Blocks(theme="soft") as demo:
     )
 
     # Keep the existing button click handler
-    submit_btn.click(
-        fn=process_user_input,
-        inputs=[
-            text_input,
-            audio_input,
-            image_input,
-            input_type,
-            chatbot,
-            voice_language,
-        ],
-        outputs=[chatbot, text_input, audio_input, image_input],
-    ).then(
-        fn=process_bot_response,
-        inputs=[audio_input, input_type, chatbot],
-        outputs=chatbot,
-    )
-
-    # Add audio_input.stop_recording event handler
     audio_input.stop_recording(
         fn=process_user_input,
         inputs=[
