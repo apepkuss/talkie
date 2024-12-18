@@ -1,3 +1,5 @@
+import re
+
 import gradio as gr
 import requests
 
@@ -55,13 +57,48 @@ def transcribe_audio(audio):
     """
     if audio is None:
         return ""
+
+    whisper_url = "http://localhost:10086/v1/audio/transcriptions"
+
+    # 构造请求的数据
+    files = {"file": open(audio, "rb")}
+    data = {
+        "language": "en",
+        "max_len": 100,
+        "split_on_word": "true",
+        "max_context": 200,
+    }
+
+    # 发送 POST 请求
+    response = requests.post(whisper_url, files=files, data=data).json()
+
+    # # 使用正则表达式提取时间戳后的内容
+    # user_message = re.sub(r"\[.*?\]\s*", "", response["text"])
+
+    # 去掉时间戳
+    processed_text = re.sub(r"\[.*?\]\s*", "", response["text"])
+
+    # 去掉非空白字符之间的换行符，但处理标点符号场景
+    transcribed_text = re.sub(
+        r"(?<=[^\s.,!?])\n(?=[^\s.,!?])",
+        "",  # 换行前后都不是标点符号或空白时去掉换行
+        processed_text,
+    )
+
+    # 可选：清理首尾多余的空格或换行符
+    user_message = transcribed_text.strip()
+
+    print(f"Transcribed text: {user_message}")
+
+    # assistant_message = chat_with_bot(user_message)
+
     # 模拟返回的转录文本
-    return "This is a transcribed text from the audio."
+    return user_message
 
 
 # Gradio App
 with gr.Blocks(theme="soft") as demo:
-    gr.Markdown("# ChatGPT-like Assistant")
+    gr.Markdown("# TalkTalk")
     gr.Markdown("Ask me anything using text or voice!")
 
     with gr.Row():
@@ -85,7 +122,7 @@ with gr.Blocks(theme="soft") as demo:
             # Voice input
             with gr.Column(visible=False) as voice_input_group:
                 audio_input = gr.Audio(
-                    sources="microphone", type="numpy", label="Voice Input"
+                    sources="microphone", type="filepath", label="Voice Input"
                 )
 
             # Submit button
@@ -113,6 +150,8 @@ with gr.Blocks(theme="soft") as demo:
         Handles user input (text or voice) and updates the chat history.
         - Shows user input immediately in the chatbox.
         """
+        print(f"Input mode: {input_mode}")
+
         if input_mode == "Keyboard" and text_msg:
             user_message = {"role": "user", "content": text_msg}
             conversation_history.append(user_message)
@@ -120,6 +159,9 @@ with gr.Blocks(theme="soft") as demo:
             return chat_history, "", None  # 返回更新后的聊天记录，清空文本框
 
         elif input_mode == "Voice" and audio_msg is not None:
+
+            print(f"Audio message: {audio_msg}")
+
             transcribed_msg = transcribe_audio(audio_msg)  # 模拟语音转文本
             user_message = {"role": "user", "content": transcribed_msg}
             chat_history.append(user_message)  # 添加用户语音输入的转文本
