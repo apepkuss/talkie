@@ -82,7 +82,7 @@ def transcribe_audio(audio, language):
     # # 使用正则表达式提取时间戳后的内容
     # user_message = re.sub(r"\[.*?\]\s*", "", response["text"])
 
-    # 去���时间戳
+    # 去掉时间戳
     processed_text = re.sub(r"\[.*?\]\s*", "", response["text"])
 
     # 去掉非空白字符之间的换行符，但处理标点符号场景
@@ -106,7 +106,7 @@ def transcribe_audio(audio, language):
 # Gradio App
 with gr.Blocks(theme="soft") as demo:
     gr.Markdown("# TalkTalk")
-    gr.Markdown("Ask me anything using text or voice!")
+    gr.Markdown("Ask me anything using text, voice, or images!")
 
     with gr.Row():
         with gr.Column():
@@ -117,6 +117,12 @@ with gr.Blocks(theme="soft") as demo:
             input_type = gr.Radio(
                 ["Keyboard", "Voice"], label="Input Type", value="Keyboard"
             )
+
+            # Add image upload toggle
+            image_toggle = gr.Checkbox(label="Include image in message", value=False)
+
+            # Add image upload component (initially hidden)
+            image_input = gr.Image(label="Upload Image", type="filepath", visible=False)
 
             # Text input
             with gr.Column(visible=True) as text_input_group:
@@ -159,30 +165,47 @@ with gr.Blocks(theme="soft") as demo:
         outputs=[text_input_group, voice_input_group],
     )
 
+    # Handle visibility of image input
+    def update_image_visibility(show_image):
+        return gr.update(visible=show_image)
+
+    image_toggle.change(
+        fn=update_image_visibility,
+        inputs=image_toggle,
+        outputs=image_input,
+    )
+
     # 改进后的逻辑：用户输入即时显示
-    def process_user_input(text_msg, audio_msg, input_mode, chat_history, voice_lang):
+    def process_user_input(
+        text_msg, audio_msg, image_msg, input_mode, chat_history, voice_lang
+    ):
         """
-        Updated to handle voice language selection
+        Updated to handle image uploads along with text/voice input
         """
         print(f"Input mode: {input_mode}")
 
+        # Handle image if present
+        image_content = ""
+        if image_msg is not None:
+            image_content = "\n[Image uploaded]"  # You can enhance this with actual image processing
+
         if input_mode == "Keyboard" and text_msg:
-            user_message = {"role": "user", "content": text_msg}
+            user_message = {"role": "user", "content": text_msg + image_content}
             conversation_history.append(user_message)
             chat_history.append(user_message)
-            return chat_history, "", None
+            return chat_history, "", None, None
 
         elif input_mode == "Voice" and audio_msg is not None:
             print(f"Audio message: {audio_msg}")
             transcribed_msg = transcribe_audio(audio_msg, voice_lang)
             print(f"Transcribed message: {transcribed_msg}")
-            user_message = {"role": "user", "content": transcribed_msg}
+            user_message = {"role": "user", "content": transcribed_msg + image_content}
             conversation_history.append(user_message)
             chat_history.append(user_message)
-            return chat_history, None, None
+            return chat_history, None, None, None
 
         else:
-            return chat_history, None, None
+            return chat_history, None, None, None
 
     def process_bot_response(audio_msg, input_mode, chat_history):
         """
@@ -204,8 +227,15 @@ with gr.Blocks(theme="soft") as demo:
     # Add text_input.submit to handle Enter key press
     text_input.submit(
         fn=process_user_input,
-        inputs=[text_input, audio_input, input_type, chatbot, voice_language],
-        outputs=[chatbot, text_input, audio_input],
+        inputs=[
+            text_input,
+            audio_input,
+            image_input,
+            input_type,
+            chatbot,
+            voice_language,
+        ],
+        outputs=[chatbot, text_input, audio_input, image_input],
     ).then(
         fn=process_bot_response,
         inputs=[audio_input, input_type, chatbot],
@@ -215,8 +245,15 @@ with gr.Blocks(theme="soft") as demo:
     # Keep the existing button click handler
     submit_btn.click(
         fn=process_user_input,
-        inputs=[text_input, audio_input, input_type, chatbot, voice_language],
-        outputs=[chatbot, text_input, audio_input],
+        inputs=[
+            text_input,
+            audio_input,
+            image_input,
+            input_type,
+            chatbot,
+            voice_language,
+        ],
+        outputs=[chatbot, text_input, audio_input, image_input],
     ).then(
         fn=process_bot_response,
         inputs=[audio_input, input_type, chatbot],
@@ -226,8 +263,15 @@ with gr.Blocks(theme="soft") as demo:
     # Add audio_input.stop_recording event handler
     audio_input.stop_recording(
         fn=process_user_input,
-        inputs=[text_input, audio_input, input_type, chatbot, voice_language],
-        outputs=[chatbot, text_input, audio_input],
+        inputs=[
+            text_input,
+            audio_input,
+            image_input,
+            input_type,
+            chatbot,
+            voice_language,
+        ],
+        outputs=[chatbot, text_input, audio_input, image_input],
     ).then(
         fn=process_bot_response,
         inputs=[audio_input, input_type, chatbot],
