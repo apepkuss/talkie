@@ -77,7 +77,9 @@ with gr.Blocks(theme="soft") as demo:
             # Text input
             with gr.Column(visible=True) as text_input_group:
                 text_input = gr.Textbox(
-                    placeholder="Type your message here...", label="Text Input"
+                    placeholder="Type your message here...",
+                    label="Text Input",
+                    interactive=True,  # Enable Enter key submission
                 )
 
             # Voice input
@@ -142,14 +144,25 @@ with gr.Blocks(theme="soft") as demo:
         chat_history.append(ai_message)  # 显示 AI 响应
         return chat_history
 
-    # 按钮点击事件处理
+    # Update the submit event handlers to include both button and Enter key
+    # Add text_input.submit to handle Enter key press
+    text_input.submit(
+        fn=process_user_input,
+        inputs=[text_input, audio_input, input_type, chatbot],
+        outputs=[chatbot, text_input, audio_input],
+    ).then(
+        fn=process_bot_response,
+        inputs=[audio_input, input_type, chatbot],
+        outputs=chatbot,
+    )
+
+    # Keep the existing button click handler
     submit_btn.click(
         fn=process_user_input,
         inputs=[text_input, audio_input, input_type, chatbot],
         outputs=[chatbot, text_input, audio_input],
     ).then(
         fn=process_bot_response,
-        # inputs=[text_input, audio_input, input_type, chatbot],
         inputs=[audio_input, input_type, chatbot],
         outputs=chatbot,
     )
