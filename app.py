@@ -51,19 +51,28 @@ def chat_with_bot(message):
         return f"An error occurred: {str(e)}"
 
 
-def transcribe_audio(audio):
+def transcribe_audio(audio, language):
     """
-    Mock transcribe audio function. In real use, integrate a transcription API or library.
+    Transcribe audio with specified language support.
     """
     if audio is None:
         return ""
 
     whisper_url = "http://localhost:10086/v1/audio/transcriptions"
 
-    # 构造请求的数据
+    # Map UI language selection to language codes
+    if language == "English":
+        lang_code = "en"
+    elif language == "Chinese":
+        lang_code = "zh"
+    else:  # Japanese
+        lang_code = "jp"
+
+    print(f"Language: {language}, Language code: {lang_code}")
+
     files = {"file": open(audio, "rb")}
     data = {
-        "language": "en",
+        "language": lang_code,  # Use selected language
         "max_len": 100,
         "split_on_word": "true",
         "max_context": 200,
@@ -116,11 +125,17 @@ with gr.Blocks(theme="soft") as demo:
                 text_input = gr.Textbox(
                     placeholder="Type your message here...",
                     label="Text Input",
-                    interactive=True,  # Enable Enter key submission
+                    interactive=True,
                 )
 
             # Voice input
             with gr.Column(visible=False) as voice_input_group:
+                # Add language selector for voice input
+                voice_language = gr.Radio(
+                    ["English", "Chinese", "Japanese"],
+                    label="Voice Language",
+                    value="English",
+                )
                 audio_input = gr.Audio(
                     sources="microphone", type="filepath", label="Voice Input"
                 )
@@ -145,27 +160,24 @@ with gr.Blocks(theme="soft") as demo:
     )
 
     # 改进后的逻辑：用户输入即时显示
-    def process_user_input(text_msg, audio_msg, input_mode, chat_history):
+    def process_user_input(text_msg, audio_msg, input_mode, chat_history, voice_lang):
         """
-        Handles user input (text or voice) and updates the chat history.
-        - Shows user input immediately in the chatbox.
+        Updated to handle voice language selection
         """
         print(f"Input mode: {input_mode}")
 
         if input_mode == "Keyboard" and text_msg:
             user_message = {"role": "user", "content": text_msg}
             conversation_history.append(user_message)
-            chat_history.append(user_message)  # 添加用户文本输入
-            return chat_history, "", None  # 返回更新后的聊天记录，清空文本框
+            chat_history.append(user_message)
+            return chat_history, "", None
 
         elif input_mode == "Voice" and audio_msg is not None:
-
             print(f"Audio message: {audio_msg}")
-
-            transcribed_msg = transcribe_audio(audio_msg)  # 模拟语音转文本
+            transcribed_msg = transcribe_audio(audio_msg, voice_lang)
             user_message = {"role": "user", "content": transcribed_msg}
-            chat_history.append(user_message)  # 添加用户语音输入的转文本
-            return chat_history, None, None  # 清空音频输入框
+            chat_history.append(user_message)
+            return chat_history, None, None
 
         else:
             return chat_history, None, None
@@ -190,7 +202,7 @@ with gr.Blocks(theme="soft") as demo:
     # Add text_input.submit to handle Enter key press
     text_input.submit(
         fn=process_user_input,
-        inputs=[text_input, audio_input, input_type, chatbot],
+        inputs=[text_input, audio_input, input_type, chatbot, voice_language],
         outputs=[chatbot, text_input, audio_input],
     ).then(
         fn=process_bot_response,
@@ -201,7 +213,7 @@ with gr.Blocks(theme="soft") as demo:
     # Keep the existing button click handler
     submit_btn.click(
         fn=process_user_input,
-        inputs=[text_input, audio_input, input_type, chatbot],
+        inputs=[text_input, audio_input, input_type, chatbot, voice_language],
         outputs=[chatbot, text_input, audio_input],
     ).then(
         fn=process_bot_response,
