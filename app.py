@@ -16,16 +16,14 @@ def chat_with_bot(message):
     """
     Sends the user's message to the API and returns the assistant's response.
     """
-    print(f"User message: {message}")
-
-    # Add user message to conversation history
-    conversation_history.append({"role": "user", "content": message})
 
     try:
         # 调用llama-api-server
         print(f"Generating chat completions")
         chat_url = "http://localhost:10086/v1/chat/completions"
         headers = {"Content-Type": "application/json"}
+
+        print("user message: {}".format(conversation_history[-1]["content"]))
 
         # 构造请求的 JSON 数据
         data = {
@@ -84,7 +82,7 @@ def transcribe_audio(audio, language):
     # # 使用正则表达式提取时间戳后的内容
     # user_message = re.sub(r"\[.*?\]\s*", "", response["text"])
 
-    # 去掉时间戳
+    # 去���时间戳
     processed_text = re.sub(r"\[.*?\]\s*", "", response["text"])
 
     # 去掉非空白字符之间的换行符，但处理标点符号场景
@@ -130,14 +128,16 @@ with gr.Blocks(theme="soft") as demo:
 
             # Voice input
             with gr.Column(visible=False) as voice_input_group:
-                # Add language selector for voice input
                 voice_language = gr.Radio(
                     ["English", "Chinese", "Japanese"],
                     label="Voice Language",
                     value="English",
                 )
                 audio_input = gr.Audio(
-                    sources="microphone", type="filepath", label="Voice Input"
+                    sources="microphone",
+                    type="filepath",
+                    label="Voice Input",
+                    streaming=False,
                 )
 
             # Submit button
@@ -175,7 +175,9 @@ with gr.Blocks(theme="soft") as demo:
         elif input_mode == "Voice" and audio_msg is not None:
             print(f"Audio message: {audio_msg}")
             transcribed_msg = transcribe_audio(audio_msg, voice_lang)
+            print(f"Transcribed message: {transcribed_msg}")
             user_message = {"role": "user", "content": transcribed_msg}
+            conversation_history.append(user_message)
             chat_history.append(user_message)
             return chat_history, None, None
 
@@ -212,6 +214,17 @@ with gr.Blocks(theme="soft") as demo:
 
     # Keep the existing button click handler
     submit_btn.click(
+        fn=process_user_input,
+        inputs=[text_input, audio_input, input_type, chatbot, voice_language],
+        outputs=[chatbot, text_input, audio_input],
+    ).then(
+        fn=process_bot_response,
+        inputs=[audio_input, input_type, chatbot],
+        outputs=chatbot,
+    )
+
+    # Add audio_input.stop_recording event handler
+    audio_input.stop_recording(
         fn=process_user_input,
         inputs=[text_input, audio_input, input_type, chatbot, voice_language],
         outputs=[chatbot, text_input, audio_input],
