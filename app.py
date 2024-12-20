@@ -63,8 +63,10 @@ def transcribe_audio(audio, language):
         lang_code = "en"
     elif language == "Chinese":
         lang_code = "zh"
-    else:  # Japanese
-        lang_code = "jp"
+    elif language == "Japanese":
+        lang_code = "ja"
+    else:
+        lang_code = "en"
 
     print(f"Language: {language}, Language code: {lang_code}")
 
